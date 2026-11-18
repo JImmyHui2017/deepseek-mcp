@@ -1,0 +1,11 @@
+- insert:
+    - id: mcp-deepseek-search
+      name: "@deepseek-ai/dsh-mcp-client"
+      config:
+        serverName: deepseek-search
+        transport: stdio
+        command: node
+        args:
+          - C:\path\to\deepseek-mcp\src\index.mjs
+        toolCallTimeoutMs: 60000
+        startupTimeoutMs: 30000

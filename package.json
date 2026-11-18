@@ -1,0 +1,22 @@
+{
+  "name": "local-deepseek-search-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local MCP server for the official DeepSeek Search and Fetch APIs",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/index.mjs",
+    "status": "node scripts/status.mjs",
+    "test": "node --test",
+    "check:live": "node scripts/check-live.mjs",
+    "register": "node scripts/register.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "4.6.7",
+    "jsonc-parser": "3.3.1",
+    "smol-toml": "1.9.1",
+    "yaml": "2.9.1"
+  }
+}

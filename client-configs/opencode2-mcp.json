@@ -1,0 +1,18 @@
+{
+  "mcp": {
+    "servers": {
+      "deepseek-search": {
+        "type": "local",
+        "command": [
+          "node",
+          "C:\\path\\to\\deepseek-mcp\\src\\index.mjs"
+        ],
+        "disabled": false,
+        "timeout": {
+          "catalog": 30000,
+          "execution": 60000
+        }
+      }
+    }
+  }
+}

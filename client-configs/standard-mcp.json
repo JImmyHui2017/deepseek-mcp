@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "deepseek-search": {
+      "command": "node",
+      "args": [
+        "C:\\path\\to\\deepseek-mcp\\src\\index.mjs"
+      ]
+    }
+  }
+}
