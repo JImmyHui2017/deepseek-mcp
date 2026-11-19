@@ -6,13 +6,24 @@
 
 ## 第一次使用
 
-1. 双击本目录的 `configure.cmd`，在隐藏输入框中填入你自己的 **DeepSeek 官方平台 API Key**。
-2. 程序使用 Windows DPAPI 加密后保存到 `%APPDATA%\deepseek-search-mcp\config.json`。同一 Windows 用户下的所有客户端共用这一份配置。不要把密钥发到聊天里。
-3. 配置程序自动通过 MCP 做一次 Search 和一次 Fetch 联网验证，最多产生两次成功请求，按当前价格合计约 **0.01 元人民币**。配置完成后重新打开各 Agent 的会话；有 MCP 重连功能的客户端也可单独重连。
+1. 安装 **Node.js 22 或更新版本**，克隆仓库或下载并解压源码。
+2. Windows 用户在项目目录打开终端运行 `.\setup.cmd`。它依次安装锁定版本的依赖、注册已检测到的客户端、更新已有条目的 Node 与源码路径，再提示输入 **DeepSeek 官方平台 API Key**。如需分步执行，使用下方命令。
+3. 密钥使用 Windows DPAPI 加密后保存到 `%APPDATA%\deepseek-search-mcp\config.json`。同一 Windows 用户下的所有客户端共用这一份配置。**换电脑或 Windows 用户后要重新输入密钥，不能直接复制加密文件。**
+4. 配置程序自动通过 MCP 做一次 Search 和一次 Fetch 联网验证，最多产生两次成功请求，按文档价格合计约 **0.01 元人民币**。完成后重启或重连各 Agent。
 
-注册器会在本机生成 `registration-report.json`，记录实际注册的客户端及原配置备份路径；该文件已被 Git 忽略，不应提交。只创建已有客户端配置对应的条目。DeepSeek Harness 写入 home 级 `~/.dsh/cordis.patch.yml`，因此适用于它的所有 profile；OpenCode 2 使用 `mcp.servers` 格式。其他支持标准 MCP 的软件可导入 `client-configs/standard-mcp.json`，或复制其中的 `command` 与 `args`，并把示例中的占位路径改为本地克隆目录。已有配置应合并服务器条目，不要用示例覆盖整个文件。
+```powershell
+npm ci --ignore-scripts
+node scripts/register.mjs --apply --update
+.\configure.cmd
+```
 
-Hermes 按实际 `HERMES_HOME` 定位配置。本机使用 `%LOCALAPPDATA%\hermes\config.yaml`；当前 Windows 版未指定 `HERMES_HOME` 时也默认使用此目录。其它 Hermes profile 需要在其配置中引用同一组 `command` / `args`，密钥继续共用。
+macOS / Linux 也可运行服务。先执行前两条命令，再在客户端的 MCP 进程环境中配置 `DEEPSEEK_API_KEY`，无须运行 Windows 配置脚本。仅在终端 `export` 的变量可能不会被桌面 Agent 继承；请在实际启动 MCP 的客户端配置中提供它。
+
+注册器会在本机生成 `registration-report.json` 和 `local-client-configs/`，记录配置备份并提供含本机实际路径的配置片段；两者均被 Git 忽略。仓库中的 `client-configs/` 始终使用占位路径，不能直接原样启动。注册器只修改已有客户端配置；若某个客户端尚未创建配置，可合并 `local-client-configs/` 中对应的片段，或手动修改通用示例中的路径。不要覆盖整个已有配置文件。
+
+DeepSeek Harness 使用 home 级 `cordis.patch.yml`，适用于所有 profile；OpenCode 2 使用 `mcp.servers` 格式。注册器识别 `CODEX_HOME`、`HERMES_HOME`、`DSH_HOME`、`XDG_CONFIG_HOME`；OpenCode 支持 `opencode.jsonc` 或 `opencode.json`。
+
+Hermes 按实际 `HERMES_HOME` 定位配置。Windows 未指定该变量时使用 `%LOCALAPPDATA%\hermes\config.yaml`；macOS / Linux 默认使用 `~/.hermes/config.yaml`。其它 Hermes profile 可引用同一组 `command` / `args`，密钥继续共用。
 
 ## 兼容方式
 
@@ -21,7 +32,7 @@ Hermes 按实际 `HERMES_HOME` 定位配置。本机使用 `%LOCALAPPDATA%\herme
 - 每个客户端有自己的子进程，共用代码与密钥；无需常驻后台进程或本地 HTTP 端口。
 - 工具同时返回 `content[].text` 与 `structuredContent`，兼容读取文本的客户端和支持结构化结果的客户端。
 - stdout 只输出 MCP 消息；API Key 不进入工具参数、工具结果或日志。服务端不会把上游错误正文直接转发给模型。
-- Node.js 22 或更新版本；当前机器为 Node.js 26。依赖已安装，版本由 `package-lock.json` 固定。
+- Node.js 22 或更新版本。依赖版本由 `package-lock.json` 固定，每台电脑需要执行 `npm ci --ignore-scripts` 安装。
 
 密钥选择顺序是进程环境变量 `DEEPSEEK_API_KEY`，然后本地 DPAPI 配置；环境变量适用于其他操作系统。DPAPI 配置只能由保存它的 Windows 用户解密。`DEEPSEEK_MCP_CONFIG` 可以指定另一份配置文件。修改加密配置后，正在运行的服务会在下一次请求时重新读取。
 
@@ -91,7 +102,19 @@ npm run check:live
 
 `status` 不联网；`test` 使用 mock 和虚构测试密钥，不调用付费接口；`check:live` 使用已配置的真实密钥，通过 MCP 发起两次官方 API 调用。测试还在安装了 DeepSeek Harness 时使用它实际携带的 MCP 客户端 SDK 验证互通。
 
-迁移到另一位置或另一台电脑后，先运行 `npm ci --ignore-scripts`。然后运行 `node scripts/register.mjs` 预览配置变更，运行 `node scripts/register.mjs --apply` 注册。已有同名条目会跳过；若目录移动，需要先移除对应客户端的旧 `deepseek-search` 条目，再注册新的路径。Windows 密钥需要重新运行 `configure.cmd` 保存。
+迁移到另一位置或另一台电脑后，先运行 `npm ci --ignore-scripts`。运行 `node scripts/register.mjs --update` 预览，再运行 `node scripts/register.mjs --apply --update` 添加服务器或刷新已有本地 stdio 条目的启动路径。`--update` 只更新 DeepSeek 服务的 `command` / `args`，保留环境变量、启停状态、工具筛选、超时和其它服务。每次修改前会备份。Windows 密钥需要在新电脑重新运行 `configure.cmd` 保存，也可直接运行 `setup.cmd` 完成整个流程。
+
+## 换电脑或目录后无法使用
+
+运行 `node scripts/status.mjs` 检查密钥；运行 `node scripts/register.mjs --update` 预览当前电脑的启动路径。常见错误对应以下处理：
+
+| 现象 | 原因与处理 |
+| --- | --- |
+| 找不到模块 / `ERR_MODULE_NOT_FOUND` | 源码不包含 `node_modules`；先安装依赖 |
+| 找不到 Node 或 `index.mjs` | 客户端仍使用旧路径，或原样复制了 `C:\path\to\...` 占位路径；重新注册 |
+| `Cannot decrypt` | Windows 密钥文件来自另一电脑或用户；重新配置密钥 |
+| `API key is not configured` | 该 MCP 进程没有收到环境变量，也没有本机密钥配置；在实际客户端中配置或运行 Windows 配置脚本 |
+| 工具没有出现在列表 | 客户端未注册、配置文件不存在被跳过，或仍需重连；检查注册输出和本机生成的配置片段 |
 
 注册器会备份原文件，只增加服务器配置，不修改 Agent 的模型选择、搜索默认规则或 skill。撤销时从客户端中删除 `deepseek-search` 条目；Harness 删除 `id: mcp-deepseek-search` 对应的 insert 块。若注册之后还修改过其它配置，建议只删除这一条，而非恢复整个旧备份。
 

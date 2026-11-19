@@ -1,26 +1,18 @@
 import { copyFile, readFile, writeFile, rename, unlink, mkdir } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { parse as parseJsonc } from 'jsonc-parser';
 import { stringify as stringifyYaml } from 'yaml';
 import { buildEntries, renderRegistration, serverName } from './registration.mjs';
+import { getTargets } from './targets.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const entrypoint = join(root, 'src', 'index.mjs');
 const entries = buildEntries(process.execPath, entrypoint);
-const hermesHome = process.env.HERMES_HOME || (process.platform === 'win32' ? join(process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'), 'hermes') : join(homedir(), '.hermes'));
-const targets = [
-  { agent: 'Codex', path: join(homedir(), '.codex', 'config.toml'), format: 'codex', entry: entries.codex },
-  { agent: 'Claude Code', path: join(homedir(), '.claude.json'), format: 'claude', entry: entries.generic },
-  { agent: 'Hermes', path: join(hermesHome, 'config.yaml'), format: 'hermes', entry: entries.hermes },
-  { agent: 'DeepSeek Harness (all profiles)', path: join(homedir(), '.dsh', 'cordis.patch.yml'), format: 'harness', entry: entries.harness },
-  { agent: 'OpenCode', path: join(homedir(), '.config', 'opencode', 'opencode.jsonc'), format: 'opencode', entry: entries.opencode },
-  { agent: 'Cursor', path: join(homedir(), '.cursor', 'mcp.json'), format: 'generic', entry: entries.generic },
-  { agent: 'Gemini CLI', path: join(homedir(), '.gemini', 'settings.json'), format: 'generic', entry: { ...entries.generic, timeout: 60000 } },
-];
+const targets = getTargets(entries);
 const apply = process.argv.includes('--apply');
+const updateExisting = process.argv.includes('--update');
 const changed = [];
 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
@@ -52,14 +44,15 @@ try {
       target.entry = entries.opencode2;
     }
     let after;
-    try { after = renderRegistration(target.format, before, target.entry); } catch (error) {
+    try { after = renderRegistration(target.format, before, target.entry, { updateExisting }); } catch (error) {
       if (error.message === 'A DeepSeek MCP entry already exists.') {
-        console.log(`${target.agent}: entry exists; left unchanged. Verify its path if this installation moved.`);
+        console.log(`${target.agent}: entry exists. Run with --update to refresh its Node and source paths after moving this installation.`);
         continue;
       }
       throw new Error(`${target.agent}: ${error.message}`);
     }
-    if (!apply) { console.log(`${target.agent}: would add ${serverName} to ${target.path}`); continue; }
+    if (after === before) { console.log(`${target.agent}: already up to date.`); continue; }
+    if (!apply) { console.log(`${target.agent}: would ${updateExisting ? 'add/update' : 'add'} ${serverName} in ${target.path}`); continue; }
     if (await readFile(target.path, 'utf8') !== before) throw new Error(`${target.agent}: configuration changed while preparing; rerun registration.`);
     const backup = `${target.path}.deepseek-backup-${timestamp}`;
     await copyFile(target.path, backup);
@@ -67,7 +60,7 @@ try {
     changed.push({ ...target, before, after, backup });
     console.log(`${target.agent}: registered; backup ${backup}`);
   }
-  const examplesDirectory = join(root, 'client-configs');
+  const examplesDirectory = join(root, 'local-client-configs');
   if (apply) {
     await mkdir(examplesDirectory, { recursive: true });
     await writeFile(join(examplesDirectory, 'standard-mcp.json'), `${JSON.stringify({ mcpServers: { [serverName]: entries.generic } }, null, 2)}\n`);

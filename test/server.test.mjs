@@ -5,6 +5,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../src/server.mjs';
+import { tmpdir } from 'node:os';
 
 async function connect(testContext, api) {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -57,11 +58,11 @@ test('fetch validates URL credentials, returns content windows and preserves Mar
   assert.equal(full.structuredContent.content.endsWith('\\n'), true);
 });
 
-test('server starts and answers status over real stdio without a configured key', async testContext => {
+test('server starts over real stdio from an unrelated working directory without a configured key', async testContext => {
   const environment = Object.fromEntries(Object.entries(process.env).filter(([, value]) => typeof value === 'string'));
   delete environment.DEEPSEEK_API_KEY;
   environment.DEEPSEEK_MCP_CONFIG = fileURLToPath(new URL('./absent-key-configuration.json', import.meta.url));
-  const transport = new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../src/index.mjs', import.meta.url))], env: environment, stderr: 'pipe' });
+  const transport = new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../src/index.mjs', import.meta.url))], cwd: tmpdir(), env: environment, stderr: 'pipe' });
   const client = new Client({ name: 'stdio-smoke', version: '1.0.0' });
   testContext.after(async () => client.close());
   await client.connect(transport);

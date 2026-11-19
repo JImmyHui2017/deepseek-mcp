@@ -26,13 +26,37 @@ try {
     const before = normalize(parser(beforeText));
     const after = normalize(parser(afterText));
     if (target.agent.includes('Harness')) {
+      const scrubLaunch = value => {
+        if (!value || typeof value !== 'object') return false;
+        if (value.id === 'mcp-deepseek-search' || (value.name === '@deepseek-ai/dsh-mcp-client' && value.config?.serverName === 'deepseek-search')) {
+          delete value.config.command;
+          delete value.config.args;
+          return true;
+        }
+        return Object.values(value).map(scrubLaunch).some(Boolean);
+      };
+      const existing = scrubLaunch(before);
       const block = after.findIndex(entry => entry.insert?.some(plugin => plugin.id === 'mcp-deepseek-search'));
-      assert.ok(block >= 0);
-      after.splice(block, 1);
+      if (existing) {
+        assert.ok(scrubLaunch(after));
+      } else {
+        assert.ok(block >= 0);
+        after.splice(block, 1);
+      }
     } else {
       const configuration = target.agent === 'Codex' || target.agent === 'Hermes' ? after.mcp_servers : target.agent === 'OpenCode' ? after.mcp.servers || after.mcp : after.mcpServers;
+      const originalConfiguration = target.agent === 'Codex' || target.agent === 'Hermes' ? before.mcp_servers : target.agent === 'OpenCode' ? before.mcp?.servers || before.mcp : before.mcpServers;
       assert.ok(configuration['deepseek-search']);
-      delete configuration['deepseek-search'];
+      if (originalConfiguration?.['deepseek-search']) {
+        delete configuration['deepseek-search'].command;
+        delete originalConfiguration['deepseek-search'].command;
+        if (target.agent !== 'OpenCode') {
+          delete configuration['deepseek-search'].args;
+          delete originalConfiguration['deepseek-search'].args;
+        }
+      } else {
+        delete configuration['deepseek-search'];
+      }
       if (target.agent === 'Hermes' && !before.mcp_servers) delete after.mcp_servers;
     }
     assert.deepEqual(after, before, `${target.agent}: unrelated configuration changed.`);

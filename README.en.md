@@ -8,10 +8,18 @@ The server exposes `deepseek_search`, `deepseek_fetch`, and `deepseek_status`. I
 
 ## Quick start
 
-1. Run `configure.cmd` on Windows and enter your official DeepSeek API key in the hidden prompt.
-2. The key is encrypted with Windows DPAPI and stored at `%APPDATA%\deepseek-search-mcp\config.json`. All clients running as the same Windows user share this configuration.
-3. The setup script performs one Search and one Fetch request through MCP to verify the installation. At the current price, this can create up to two successful billable requests.
-4. Restart or reconnect your MCP clients.
+1. Install **Node.js 22 or later**, then clone the repository or download and extract the source.
+2. On Windows, open a terminal in the project directory and run `.\setup.cmd`. It installs dependencies, registers detected MCP clients, refreshes existing launch paths, and prompts for your official DeepSeek API key. For separate steps, use the commands below.
+3. The key is encrypted with Windows DPAPI and stored at `%APPDATA%\deepseek-search-mcp\config.json`. **Enter the key again on another computer or Windows account; copying the encrypted file will not work.**
+4. Setup verifies one Search and one Fetch request through MCP (up to two successful billable API calls), then restart or reconnect your clients.
+
+```powershell
+npm ci --ignore-scripts
+node scripts/register.mjs --apply --update
+.\configure.cmd
+```
+
+On macOS / Linux, run the first two commands and provide `DEEPSEEK_API_KEY` in the MCP process environment using your client's server settings. Windows setup scripts are not required. A variable exported in a terminal may not reach a desktop client; configure the environment of the process that actually launches MCP.
 
 The key is never included in tool arguments, tool results, logs, examples, or Git files. On other operating systems, set `DEEPSEEK_API_KEY` in the MCP process environment. `DEEPSEEK_MCP_CONFIG` can point to another encrypted configuration file.
 
@@ -62,17 +70,31 @@ Search content can be cached or incomplete at the upstream service. A returned p
 
 ## Client registration
 
-Run `node scripts/register.mjs` for a dry run, then `node scripts/register.mjs --apply` to add the server to detected client configurations. The registration script creates local backups and a `registration-report.json`; that report is ignored by Git and must not be published.
+Run `node scripts/register.mjs --update` for a dry run, then `node scripts/register.mjs --apply --update` to add the server or refresh existing local stdio launch paths. Updating changes only this server's `command` / `args`, preserving environment variables, enablement, timeouts, filters, and other servers. Remote entries require manual changes. Every modification creates a backup.
+
+The script generates `registration-report.json` and `local-client-configs/`, both ignored by Git. The latter contains snippets with paths for the current machine. The tracked examples in `client-configs/` always retain placeholder paths and are never overwritten by registration.
 
 The current registration targets are:
 
-- Codex: `~/.codex/config.toml`
+- Codex: `CODEX_HOME/config.toml`, falling back to `~/.codex/config.toml`
 - Claude Code: `~/.claude.json`
-- Hermes Agent: the active `HERMES_HOME/config.yaml`
-- DeepSeek Harness: the home-level `~/.dsh/cordis.patch.yml`, shared by profiles
-- OpenCode 1 and OpenCode 2 formats
+- Hermes Agent: `HERMES_HOME/config.yaml`, falling back to `%LOCALAPPDATA%\hermes\config.yaml` on Windows or `~/.hermes/config.yaml` elsewhere
+- DeepSeek Harness: `DSH_HOME/cordis.patch.yml`, falling back to `~/.dsh/cordis.patch.yml`, shared by profiles
+- OpenCode 1 and 2: `opencode.jsonc` or `opencode.json` under `XDG_CONFIG_HOME/opencode` (default `~/.config/opencode`)
 
-The files under `client-configs/` contain a generic placeholder path. Replace it with the local clone path before importing an example. Do not replace an entire existing client configuration with an example file.
+Only existing client configuration files are modified. If a client has no configuration yet, merge a generated snippet from `local-client-configs/` or create its server entry manually. Do not replace an entire existing client configuration with an example file.
+
+## Moving to another computer or directory
+
+Install dependencies on the destination and rerun registration with `--apply --update` to refresh the Node.js and source paths. On Windows, run `configure.cmd` again to encrypt the key for the new account. Alternatively, run `setup.cmd` to perform all steps. The server resolves its own files relative to the code and its configuration from the current environment; generated MCP launch entries contain machine-specific absolute paths and must be regenerated after moving.
+
+| Symptom | Fix |
+| --- | --- |
+| `ERR_MODULE_NOT_FOUND` | Run `npm ci --ignore-scripts` in the project directory |
+| Missing Node executable or `index.mjs` | Refresh registration; replace any unchanged `C:\path\to\...` example paths |
+| `Cannot decrypt` | Re-enter the key for this Windows computer/account |
+| `API key is not configured` | Set the key in the actual MCP process environment or use Windows key setup |
+| No tools appear | Check registration output for skipped clients and reconnect; manually merge a generated snippet if needed |
 
 ## Development and verification
 
